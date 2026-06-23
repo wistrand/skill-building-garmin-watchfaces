@@ -9,8 +9,13 @@
 #   new-project.sh <Name> [device] [target-dir]
 #
 # Examples:
-#   new-project.sh Moonphase
-#   new-project.sh Moonphase marq2aviator ./moonphase
+#   new-project.sh Moonphase                       # -> ./moonphase/
+#   new-project.sh Moonphase marq2aviator ./mp     # -> ./mp/
+#   new-project.sh Moonphase marq2aviator .         # -> the current directory
+#
+# Pass "." as target-dir to scaffold into the current directory (no new
+# subdirectory). It refuses only if the target already holds a project, so an
+# empty or unrelated directory is fine.
 #
 # Defaults: device=marq2aviator, target-dir=./<name-lowercased>
 set -euo pipefail
@@ -24,8 +29,13 @@ fi
 LOWER="$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]')"
 DIR="${3:-./$LOWER}"
 
-if [ -e "$DIR" ]; then
-  echo "refusing to overwrite existing path: $DIR" >&2
+# Refuse only if the target already holds a Connect IQ project, so scaffolding
+# into the current directory (target-dir ".") or any empty/unrelated directory
+# works. A non-existing default path is created below.
+if [ -e "$DIR/manifest.xml" ] || ls "$DIR"/*.jungle >/dev/null 2>&1 \
+    || [ -d "$DIR/source" ]; then
+  echo "refusing to scaffold over an existing project in: $DIR" >&2
+  echo "(found a manifest.xml, a .jungle, or a source/ directory there)" >&2
   exit 1
 fi
 

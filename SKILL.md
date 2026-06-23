@@ -41,7 +41,11 @@ All three are stdlib/shell only and take the SDK and device locations from flags
 
 ```
 - [ ] 1. Pick targets and vet them (Workflow B). Let the weakest device set the design ceiling.
-- [ ] 2. Scaffold: scripts/new-project.sh <Name> <primary-device>
+- [ ] 2. Scaffold: scripts/new-project.sh <Name> <primary-device> [target-dir]
+        Default creates ./<name>/. If the user asks to scaffold "in this dir"
+        / "here" / "the current directory", pass "." as target-dir so it
+        writes into the current directory with no new subdirectory:
+        scripts/new-project.sh <Name> <primary-device> .
 - [ ] 3. Build + run in the sim (reference/toolchain.md). Confirm a face renders.
 - [ ] 4. Implement drawing in the View's onUpdate; keep the per-frame budget in mind (reference/performance.md).
 - [ ] 5. Add always-on/sleep handling early, not last (reference/aod-and-sleep.md).
