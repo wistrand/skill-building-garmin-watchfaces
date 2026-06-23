@@ -1,0 +1,6 @@
+{
+  "name": "building-garmin-watchfaces",
+  "version": "0.1.0",
+  "description": "Build Garmin Connect IQ watch faces in Monkey C: toolchain, device capability vetting, always-on/sleep handling, performance budgeting, font sizing, and app settings.",
+  "author": "Erik Wistrand"
+}
