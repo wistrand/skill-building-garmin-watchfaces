@@ -38,7 +38,7 @@ mkdir -p "$DIR/source" "$DIR/resources/strings" "$DIR/resources/drawables"
 # --- launcher icon (generated solid PNG; replace with your own art) ---------
 python3 - "$DIR/resources/drawables/launcher_icon.png" <<'PY'
 import sys, struct, zlib
-size = 40
+size = 60
 # opaque dark-grey RGBA raster with a 1-byte filter prefix per row
 row = b"\x00" + bytes((40, 40, 48, 255)) * size
 raw = row * size
