@@ -1,6 +1,6 @@
 ---
 name: building-garmin-watchfaces
-description: Builds Garmin Connect IQ watch faces in Monkey C — toolchain setup, device capability vetting, always-on (AOD) and sleep handling, performance budgeting, font sizing, and app settings. Use when creating, building, configuring, profiling, or debugging a Garmin watch face or Connect IQ project, or when checking whether a target watch can run a given design.
+description: Builds Garmin Connect IQ watch faces in Monkey C — toolchain setup, device capability vetting, always-on (AOD) and sleep handling, performance budgeting, font sizing, app settings, sensor/data sources and permissions, background web fetching, and store publishing. Use when creating, building, configuring, profiling, debugging, or publishing a Garmin watch face or Connect IQ project, or when checking whether a target watch can run a given design.
 ---
 
 # Building Garmin watch faces
@@ -16,7 +16,10 @@ The reference implementation behind this guidance is an AMOLED analog face (moon
 - Slow/janky redraw, out-of-memory, or "can't cache" → [reference/performance.md](reference/performance.md).
 - Text the wrong size on one device, or radial/curved text missing → [reference/fonts.md](reference/fonts.md).
 - Adding configurable options → [reference/settings.md](reference/settings.md).
+- Reading HR/steps/weather/battery/location, or a blank field / permission error → [reference/data-sources.md](reference/data-sources.md).
+- Fetching data over the network (background service, `makeWebRequest`, a `-403` / silent no-fetch) → [reference/background-services.md](reference/background-services.md).
 - Build/run/sim mechanics → [reference/toolchain.md](reference/toolchain.md).
+- Shipping to the store (`.iq` export, beta, updates) → [reference/publishing.md](reference/publishing.md).
 
 ## Reference (read on demand)
 
@@ -26,23 +29,43 @@ The reference implementation behind this guidance is an AMOLED analog face (moon
 - [reference/performance.md](reference/performance.md) — 128 KB heap vs the graphics pool, the per-frame budget, caching and precompute.
 - [reference/fonts.md](reference/fonts.md) — proportional sizing across devices; vector vs bitmap fonts.
 - [reference/settings.md](reference/settings.md) — app settings, the value conventions, and the simulator gotchas.
+- [reference/data-sources.md](reference/data-sources.md) — reading sensors/activity/weather/battery/location in a face, the permissions they need, and the empty-permissions silent-no-data trap.
+- [reference/background-services.md](reference/background-services.md) — fetching web data: the background service shape, makeWebRequest HTTPS/redirect rules, the background memory budget and `-403`, the `(:background)` trap, Storage hand-off, sim temporal-event triggering.
+- [reference/publishing.md](reference/publishing.md) — release `.iq` export, key/app-id continuity, store listing, versioning, beta, review pitfalls.
+
+## Setup (once per machine)
+
+Before any build: run `${CLAUDE_SKILL_DIR}/scripts/setup-connectiq.sh [sdk-version] [manifest.xml]` once. It generates (or reuses) the dev key, installs the SDK-manager CLI, logs in, downloads an SDK, and downloads the manifest's devices with fonts. Then put the SDK on PATH (`export PATH="$(connect-iq-sdk-manager-cli sdk current-path --bin):$PATH"`). Details and the manual equivalent: [reference/toolchain.md](reference/toolchain.md).
 
 ## Bundled scripts
 
-Reference them with the skill's own directory so paths resolve wherever the skill is installed:
+The scripts are **run in place from the skill directory against your project's current directory** — they auto-detect the project's `*.jungle`, key, and SDK from the cwd and environment, so you do **not** copy them into the project. Two ways to invoke:
 
+- Directly: `${CLAUDE_SKILL_DIR}/scripts/simrun.sh <device>` (or your checkout path) from the project root.
+- Via a project `Makefile` whose `SCRIPTS` var points at `${CLAUDE_SKILL_DIR}/scripts` — see `Makefile.template` below.
+
+Copy a script into the project's own `./scripts/` only when you need to **customise** it (e.g. a project-specific gallery/screenshot variant); leave the generic build/run/install ones referenced from the skill so fixes flow through. The `${CLAUDE_SKILL_DIR}` paths below resolve wherever the skill is installed:
+
+- `${CLAUDE_SKILL_DIR}/scripts/setup-connectiq.sh` — bootstrap the CLI toolchain: generate (or reuse) the dev key, install the open-source SDK-manager CLI, log in, download an SDK + the manifest's devices. Run once on a fresh machine.
 - `${CLAUDE_SKILL_DIR}/scripts/vet-device.py` — report a device's display/API/graphics-pool/colour/**vector-font** capabilities and assert requirements. Run this before committing to a design or adding a target.
 - `${CLAUDE_SKILL_DIR}/scripts/new-project.sh` — scaffold a minimal buildable watch-face project (manifest, jungle, source, resources).
-- `${CLAUDE_SKILL_DIR}/scripts/shot.sh` — build, load into the simulator, and screenshot the window.
+- `${CLAUDE_SKILL_DIR}/scripts/shot.sh` — screenshot a running sim: build, load, wait a fixed delay, capture the window. Use when the sim is already up and you want a quick image.
+- `${CLAUDE_SKILL_DIR}/scripts/auto-shot.sh` — same screenshot, but restarts the sim and waits for the render to actually settle (frame-diff detection) instead of a fixed delay. Use for reliable CI / gallery capture.
+- `${CLAUDE_SKILL_DIR}/scripts/simrun.sh` — build and load into the sim (launching it if needed), or `--install` to sideload, optionally overriding settings defaults via env vars named after the property ids. Use to (re)run a build, especially with settings overrides. See [reference/settings.md](reference/settings.md).
+- `${CLAUDE_SKILL_DIR}/scripts/install.sh` — build (if needed) and sideload the .prg onto a USB-connected watch over MTP. Run from the project dir; defaults to fenix843mm.
+- `${CLAUDE_SKILL_DIR}/scripts/uninstall.sh` — remove sideloaded .prg(s) from a USB watch (inverse of install.sh; do this before a beta/store install of the same app id).
+- `${CLAUDE_SKILL_DIR}/scripts/gen-settings-doc.py` — generate a Markdown settings reference from `resources/settings/*.xml`.
+- `${CLAUDE_SKILL_DIR}/scripts/Makefile.template` — optional one-entry-point wiring (`make build/all/run/shot/install/package/package-beta/…`) over `monkeyc` and the scripts above. Copy it into a project as `Makefile` and edit `NAME`/`DEVICES`/`SCRIPTS` (point `SCRIPTS` at this `${CLAUDE_SKILL_DIR}/scripts` dir). The `package`/`package-beta` targets are the release `.iq` builds (see [reference/publishing.md](reference/publishing.md)).
 
-All three are stdlib/shell only and take the SDK and device locations from flags or environment, so they work on any machine with the CIQ toolchain installed.
+All scripts are stdlib/shell only and take the SDK and device locations from flags or environment, so they work on any machine with the CIQ toolchain installed.
 
 ## Workflow A — scaffold a new watch face
 
 ```
 - [ ] 1. Pick targets and vet them (Workflow B). Let the weakest device set the design ceiling.
 - [ ] 2. Scaffold: scripts/new-project.sh <Name> <primary-device> [target-dir]
-        Default creates ./<name>/. If the user asks to scaffold "in this dir"
+        Default device/sim target is fenix843mm (fenix8) unless the user names
+        another. Default creates ./<name>/. If the user asks to scaffold "in this dir"
         / "here" / "the current directory", pass "." as target-dir so it
         writes into the current directory with no new subdirectory:
         scripts/new-project.sh <Name> <primary-device> .
@@ -50,7 +73,11 @@ All three are stdlib/shell only and take the SDK and device locations from flags
 - [ ] 4. Implement drawing in the View's onUpdate; keep the per-frame budget in mind (reference/performance.md).
 - [ ] 5. Add always-on/sleep handling early, not last (reference/aod-and-sleep.md).
 - [ ] 6. Size text off the dial radius, not getFontHeight (reference/fonts.md).
-- [ ] 7. Expose options via resources/settings (reference/settings.md).
+- [ ] 7. Pull live data (HR/steps/weather/battery/location) and declare the matching
+        manifest permissions; null-check every field (reference/data-sources.md).
+- [ ] 8. Expose options via resources/settings (reference/settings.md).
+- [ ] 9. Ship it: export the release .iq and submit, keeping the key and app id
+        constant (reference/publishing.md).
 ```
 
 Step 1 first: the cheapest time to discover a missing capability (no vector fonts, small graphics pool) is before you write drawing code, not after.

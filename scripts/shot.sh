@@ -5,6 +5,11 @@
 # waits a fixed delay for the face to render, then captures the simulator's X11
 # window by id (not the screen), so it works regardless of window position.
 #
+# The wait is a fixed SHOT_WAIT seconds, not render detection: on a slow cold
+# start the capture can land on a still-blank face. Bump SHOT_WAIT or re-run if
+# the image is empty. To just (re)build and load — or to override settings —
+# use simrun.sh, which also launches the sim if it isn't running.
+#
 # Usage:
 #   shot.sh [device] [out.png]
 #
@@ -19,7 +24,7 @@
 # sim is currently running (monkeydo cannot switch a running sim's device).
 set -euo pipefail
 
-DEVICE="${1:-marq2aviator}"
+DEVICE="${1:-fenix843mm}"
 OUT="${2:-shot.png}"
 KEY="${DEVELOPER_KEY:-$HOME/.connectiq/developer_key.der}"
 WAIT="${SHOT_WAIT:-9}"

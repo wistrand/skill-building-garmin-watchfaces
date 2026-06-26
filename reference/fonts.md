@@ -3,6 +3,7 @@
 ## Contents
 - The problem: bitmap font sizes vary by device
 - The solution: size off the dial radius, render via vector
+- System fonts: pick by measured width, never upsize
 - Vector vs bitmap fallback
 - Other divergence sources
 - Checklist
@@ -26,6 +27,17 @@ tinySize  = REF_TINY  * scale
 Build the vector fonts at those sizes (e.g. via `getVectorFont(:size)`). Text then keeps the reference proportions on every device regardless of that device's bitmap font sizes. Measure layout offsets off the **resolved** font (`getFontHeight` of whatever font you actually draw with), so nudges track the rendered glyphs whether vector or bitmap-fallback.
 
 Example reference constants from an analog face tuned on a 390-px device: `REF_RADIUS = 195`, `REF_XTINY = 29`, `REF_TINY = 39`. Use your own from your reference device.
+
+## System fonts: pick by measured width, never upsize
+
+For a value drawn with a **system font** (e.g. the clock in `FONT_NUMBER_MEDIUM`), you cannot size proportionally — you get the device's fixed font tiers, and those tiers differ across devices (a fenix renders the number font larger than a venu/marq at the same resolution), so a tier that fits on your reference device overflows on another. Don't hardcode the tier. Measure and step down:
+
+```
+font = FONT_NUMBER_MEDIUM
+if (dc.getTextWidthInPixels(str, font) > w * 0.43) { font = FONT_NUMBER_MILD }
+```
+
+Pick the largest tier that fits your width budget and fall back to a smaller one when it doesn't — **never upsize** (the reference tier is the ceiling). `getTextWidthInPixels` reflects the actual device font, so this adapts per device with no per-device constants. (For your own text where a vector font is available, size off the dial radius instead, as above.)
 
 ## Vector vs bitmap fallback
 

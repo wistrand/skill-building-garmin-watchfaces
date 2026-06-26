@@ -1,0 +1,83 @@
+# Connect IQ watch-face build helpers (template).
+#
+# Copy this into your project root as `Makefile` and edit the three vars below
+# (NAME, DEVICES, and SCRIPTS if you did not copy the skill's scripts locally).
+# It wires monkeyc (build/package) and the skill's bundled scripts (run/shot/
+# install) behind one entry point. Usage: make <target> [DEVICE=<id>]
+SHELL := /bin/bash
+
+# --- edit these (keep values flush; trailing spaces are significant in make) -
+# the <name>.jungle basename / project name
+NAME ?= app
+# default single-device target
+DEVICE ?= fenix843mm
+# full product list (build/test all of these)
+DEVICES := fenix843mm fenix847mm
+# the skill's scripts dir — invoked in place, not copied in. Point at your skill
+# install or checkout; only set to ./scripts if you copied the scripts locally.
+SCRIPTS ?= $(HOME)/.claude/skills/building-garmin-watchfaces/scripts
+# ----------------------------------------------------------------------------
+
+JUNGLE := $(NAME).jungle
+# beta-channel jungle. Keep non-production jungles under channels/ so the scripts'
+# ./*.jungle auto-detect only sees the production jungle. See publishing.md.
+BETA_JUNGLE := channels/$(NAME)-beta.jungle
+KEY := $(HOME)/.connectiq/developer_key.der
+BIN := bin
+
+SDK_BIN := $(shell connect-iq-sdk-manager-cli sdk current-path --bin 2>/dev/null)
+MONKEYC := $(if $(SDK_BIN),$(SDK_BIN)/monkeyc,monkeyc)
+
+SRC  := $(wildcard source/*.mc) manifest.xml $(JUNGLE) $(wildcard resources/*/*) $(wildcard resources-launcher/*/*/*)
+PRGS := $(addprefix $(BIN)/$(NAME)-,$(addsuffix .prg,$(DEVICES)))
+
+.PHONY: help build all run shot install uninstall package package-beta settings-doc sim sim-restart clean
+.DEFAULT_GOAL := help
+
+help: ## Show this help
+	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sort | \
+	  awk -F':.*## ' '{printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}'
+	@echo "  (override device with DEVICE=<id>; devices: $(DEVICES))"
+
+build: $(BIN)/$(NAME)-$(DEVICE).prg ## Build DEVICE (default fenix843mm)
+
+all: $(PRGS) ## Build a .prg for every device in DEVICES (catches per-tier failures)
+
+$(BIN)/$(NAME)-%.prg: $(SRC)
+	@mkdir -p $(BIN)
+	$(MONKEYC) -d $* -f $(JUNGLE) -o $@ -y $(KEY) -w
+
+run: ## Build DEVICE + load into the sim. Override settings via env vars named after properties.xml ids.
+	@$(SCRIPTS)/simrun.sh $(DEVICE)
+
+shot: ## Build DEVICE, wait for the render, screenshot -> bin/shot-<device>.png
+	@mkdir -p $(BIN)
+	@$(SCRIPTS)/auto-shot.sh $(DEVICE) $(BIN)/shot-$(DEVICE).png
+
+install: ## Build + sideload to a connected watch (use a dev app id; see publishing.md)
+	@$(SCRIPTS)/simrun.sh --install $(DEVICE)
+
+uninstall: ## Remove sideloaded .prg(s) from a connected watch
+	@$(SCRIPTS)/uninstall.sh
+
+package: ## Build the PRODUCTION release .iq (all products) -> bin/<name>.iq
+	@mkdir -p $(BIN)
+	$(MONKEYC) -e -r -w -f $(JUNGLE) -o $(BIN)/$(NAME).iq -y $(KEY)
+
+package-beta: ## Build the BETA release .iq -> bin/<name>-beta.iq
+	@mkdir -p $(BIN)
+	$(MONKEYC) -e -r -w -f $(BETA_JUNGLE) -o $(BIN)/$(NAME)-beta.iq -y $(KEY)
+
+settings-doc: ## Regenerate the settings reference from resources/settings/*.xml
+	@$(SCRIPTS)/gen-settings-doc.py
+
+sim: ## Start the simulator if not already running
+	@pgrep -f 'bin/simulato[r]' >/dev/null && echo "simulator already running" || \
+	  { setsid env GDK_BACKEND=x11 $(SDK_BIN)/simulator >/tmp/ciqsim.log 2>&1 </dev/null & echo "simulator started"; }
+
+sim-restart: ## Restart the simulator (needed to switch DEVICE)
+	-@pkill -f 'bin/simulato[r]' 2>/dev/null; sleep 1
+	@setsid env GDK_BACKEND=x11 $(SDK_BIN)/simulator >/tmp/ciqsim.log 2>&1 </dev/null & echo "simulator restarted"
+
+clean: ## Remove build artifacts
+	rm -f $(BIN)/*.prg $(BIN)/*.iq $(BIN)/*.log $(BIN)/*.debug.xml

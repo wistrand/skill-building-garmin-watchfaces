@@ -41,7 +41,7 @@ When `displayType` is `amoled`, the device reports `requiresBurnInProtection` in
 
 ## There is no API to query power mode
 
-The only signal is the two callbacks. The previously-available sleep-state property was removed, so you cannot poll "am I awake?". If a callback is dropped, nothing in the official API lets you recover deterministically.
+The only signal is the two callbacks. No API reports the watch face's current power state — you cannot poll "am I awake?" (the `Activity.Info.isSleepMode`/`UserProfile` sleep fields are about the *user's* night-sleep schedule, not the face's low/high power). If a callback is dropped, nothing in the official API lets you recover deterministically.
 
 ## Dropped callbacks and how they strand the face
 

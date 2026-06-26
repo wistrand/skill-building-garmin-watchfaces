@@ -9,19 +9,19 @@
 #   new-project.sh <Name> [device] [target-dir]
 #
 # Examples:
-#   new-project.sh Moonphase                       # -> ./moonphase/
-#   new-project.sh Moonphase marq2aviator ./mp     # -> ./mp/
-#   new-project.sh Moonphase marq2aviator .         # -> the current directory
+#   new-project.sh Moonphase                       # -> ./moonphase/ (fenix843mm)
+#   new-project.sh Moonphase fenix847mm ./mp       # -> ./mp/
+#   new-project.sh Moonphase fenix843mm .          # -> the current directory
 #
 # Pass "." as target-dir to scaffold into the current directory (no new
 # subdirectory). It refuses only if the target already holds a project, so an
 # empty or unrelated directory is fine.
 #
-# Defaults: device=marq2aviator, target-dir=./<name-lowercased>
+# Defaults: device=fenix843mm, target-dir=./<name-lowercased>
 set -euo pipefail
 
 NAME="${1:-}"
-DEVICE="${2:-marq2aviator}"
+DEVICE="${2:-fenix843mm}"
 if [ -z "$NAME" ]; then
   echo "usage: new-project.sh <Name> [device] [target-dir]" >&2
   exit 2
@@ -45,6 +45,14 @@ APPID="$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
 
 mkdir -p "$DIR/source" "$DIR/resources/strings" "$DIR/resources/drawables"
 
+# --- .gitignore (build artifacts + sim/editor cruft) ------------------------
+cat > "$DIR/.gitignore" <<'EOF'
+bin/
+tmp/
+*.prg
+*.iq
+EOF
+
 # --- launcher icon (generated solid PNG; replace with your own art) ---------
 python3 - "$DIR/resources/drawables/launcher_icon.png" <<'PY'
 import sys, struct, zlib
@@ -63,6 +71,10 @@ open(sys.argv[1], "wb").write(png)
 PY
 
 # --- manifest ---------------------------------------------------------------
+# minApiLevel 3.1.0 keeps the starter face buildable on older devices. Raise it
+# to match the newest API you actually call, or those calls won't compile:
+# 4.0.0 for the CIQ 4 graphics pool (createBufferedBitmap / enhancedGraphicSupport),
+# 3.0.0 for getVectorFont / drawRadialText. (Weather arrived in 3.2.0.)
 cat > "$DIR/manifest.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
