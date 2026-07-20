@@ -20,8 +20,8 @@
 # Requires: the CIQ toolchain on PATH (or the SDK manager CLI to add it),
 # ImageMagick (`import`), and `xprop` (part of the base X11 tools). The
 # simulator must already be running; on Wayland start it with GDK_BACKEND=x11
-# so its X11 window is findable. The build device should match the device the
-# sim is currently running (monkeydo cannot switch a running sim's device).
+# so its X11 window is findable. The sim switches to the pushed build's
+# device automatically (verified SDK 9.1; no restart needed).
 set -euo pipefail
 
 DEVICE="${1:-fenix843mm}"

@@ -15,10 +15,11 @@
 #
 # Requires: CIQ toolchain on PATH (or the SDK manager CLI to add it), ImageMagick
 # (`magick`, `import`, `compare`), and `xprop`. The sim is killed and relaunched
-# so the baseline is blank and the device is correct (monkeydo cannot switch a
-# running sim's device); on Wayland it is launched under GDK_BACKEND=x11 so its
-# X11 window is findable. To just load a build without screenshotting, use shot.sh
-# / simrun.sh.
+# so the render-detection baseline is a blank window (monkeydo itself switches
+# a running sim to the pushed device — verified SDK 9.1 — but a loaded face
+# would poison the blank baseline); on Wayland it is launched under
+# GDK_BACKEND=x11 so its X11 window is findable. To just load a build without
+# screenshotting, use shot.sh / simrun.sh.
 set -euo pipefail
 # C.UTF-8, not C: forces '.' decimal in ImageMagick fx output while keeping
 # xprop's window-title conversion working — device names are non-ASCII

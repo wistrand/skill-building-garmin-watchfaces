@@ -64,7 +64,7 @@ connectiq &                                   # start the simulator once
 monkeydo bin/app-<device>.prg <device>        # load / reload the app
 ```
 
-`monkeydo` sends only the `.prg`. It cannot switch the device of a running sim — kill and relaunch the sim to change device.
+`monkeydo` sends only the `.prg`. Pushing a build for a different device switches the running sim to that device (verified SDK 9.1; older guidance claimed a sim restart was needed — it is not). The switch is a full device reload and takes ~10-20 s to appear — and on a long-running sim a push can be silently ignored (monkeydo exits 0, no output); restart the sim if a push does not appear.
 
 The launcher on PATH is `connectiq` (a small shell wrapper); it execs the actual binary named `simulator`, whose window title is "CIQ Simulator". So `connectiq &`, `pgrep -f simulator`, and the `CIQ Simulator` window all refer to the same process — the bundled scripts use whichever is convenient.
 
