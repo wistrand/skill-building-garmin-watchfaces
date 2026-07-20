@@ -37,6 +37,8 @@ The reference implementation behind this guidance is an AMOLED analog face (moon
 
 Before any build: run `${CLAUDE_SKILL_DIR}/scripts/setup-connectiq.sh [sdk-version] [manifest.xml]` once. It generates (or reuses) the dev key, installs the SDK-manager CLI, logs in, downloads an SDK, and downloads the manifest's devices with fonts. Then put the SDK on PATH (`export PATH="$(connect-iq-sdk-manager-cli sdk current-path --bin):$PATH"`). Details and the manual equivalent: [reference/toolchain.md](reference/toolchain.md).
 
+The **simulator** binary needs `libwebkit2gtk-4.0` (dropped on rolling distros — builds still work, the sim won't start) and a usable DISPLAY (it segfaults headless without Xvfb + a WM). Both the fix options and the headless/container recipe are in [reference/toolchain.md](reference/toolchain.md) "Headless and container use". A ready-made containerized toolchain (pinned image, host-X or headless VNC simulator, in-container SDK download, host shims for `monkeyc`/`monkeydo`/`make`): <https://github.com/wistrand/garmin-dev>.
+
 ## Bundled scripts
 
 The scripts are **run in place from the skill directory against your project's current directory** — they auto-detect the project's `*.jungle`, key, and SDK from the cwd and environment, so you do **not** copy them into the project. Two ways to invoke:

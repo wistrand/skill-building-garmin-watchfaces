@@ -25,8 +25,12 @@ BETA_JUNGLE := channels/$(NAME)-beta.jungle
 KEY := $(HOME)/.connectiq/developer_key.der
 BIN := bin
 
+# ?= so an environment- or CLI-provided MONKEYC/SIM wins — that is what lets a
+# containerized toolchain interpose PATH shims (or `make MONKEYC=... build`)
+# without editing this file. Default: the active SDK's binary, else bare name.
 SDK_BIN := $(shell connect-iq-sdk-manager-cli sdk current-path --bin 2>/dev/null)
-MONKEYC := $(if $(SDK_BIN),$(SDK_BIN)/monkeyc,monkeyc)
+MONKEYC ?= $(if $(SDK_BIN),$(SDK_BIN)/monkeyc,monkeyc)
+SIM     ?= $(if $(SDK_BIN),$(SDK_BIN)/simulator,simulator)
 
 SRC  := $(wildcard source/*.mc) manifest.xml $(JUNGLE) $(wildcard resources/*/*) $(wildcard resources-launcher/*/*/*)
 PRGS := $(addprefix $(BIN)/$(NAME)-,$(addsuffix .prg,$(DEVICES)))
@@ -73,11 +77,11 @@ settings-doc: ## Regenerate the settings reference from resources/settings/*.xml
 
 sim: ## Start the simulator if not already running
 	@pgrep -f 'bin/simulato[r]' >/dev/null && echo "simulator already running" || \
-	  { setsid env GDK_BACKEND=x11 $(SDK_BIN)/simulator >/tmp/ciqsim.log 2>&1 </dev/null & echo "simulator started"; }
+	  { setsid env GDK_BACKEND=x11 $(SIM) >/tmp/ciqsim.log 2>&1 </dev/null & echo "simulator started"; }
 
 sim-restart: ## Restart the simulator (needed to switch DEVICE)
 	-@pkill -f 'bin/simulato[r]' 2>/dev/null; sleep 1
-	@setsid env GDK_BACKEND=x11 $(SDK_BIN)/simulator >/tmp/ciqsim.log 2>&1 </dev/null & echo "simulator restarted"
+	@setsid env GDK_BACKEND=x11 $(SIM) >/tmp/ciqsim.log 2>&1 </dev/null & echo "simulator restarted"
 
 clean: ## Remove build artifacts
 	rm -f $(BIN)/*.prg $(BIN)/*.iq $(BIN)/*.log $(BIN)/*.debug.xml

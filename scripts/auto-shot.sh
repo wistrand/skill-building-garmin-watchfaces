@@ -20,7 +20,11 @@
 # X11 window is findable. To just load a build without screenshotting, use shot.sh
 # / simrun.sh.
 set -euo pipefail
-export LC_ALL=C   # force '.' decimal in ImageMagick fx output
+# C.UTF-8, not C: forces '.' decimal in ImageMagick fx output while keeping
+# xprop's window-title conversion working — device names are non-ASCII
+# ("fēnix"), and under an ASCII locale the title lookup can silently match
+# the wrong window.
+export LC_ALL=C.UTF-8
 
 DEVICE="${1:-fenix843mm}"
 OUT="${2:-shot.png}"
@@ -41,10 +45,13 @@ monkeyc -d "$DEVICE" -f "$JUNGLE" -o "bin/$NAME-$DEVICE.prg" -y "$KEY" -w
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 # Capture the sim's X11 window (found by WM_NAME) to $1; non-zero if not found.
+# Take the LAST match: on some GTK builds the sim creates a second window on
+# device load and leaves the initial blank one in _NET_CLIENT_LIST; the newest
+# match is the live device view (harmless where only one window matches).
 capture() {
   local id win=""
   for id in $(xprop -root _NET_CLIENT_LIST 2>/dev/null | grep -oE '0x[0-9a-f]+'); do
-    if xprop -id "$id" WM_NAME 2>/dev/null | grep -qi 'CIQ Simulator'; then win="$id"; break; fi
+    if xprop -id "$id" WM_NAME 2>/dev/null | grep -qi 'CIQ Simulator'; then win="$id"; fi
   done
   [ -n "$win" ] || return 1
   import -window "$win" "$1" 2>/dev/null
@@ -63,12 +70,16 @@ echo "loading app..."
 setsid monkeydo "bin/$NAME-$DEVICE.prg" "$DEVICE" >/tmp/monkeydo.log 2>&1 </dev/null &
 
 # Changed-pixel count between two frames, each normalised to 240x240 first.
+# Computed via a difference composite, not `compare -metric AE`: AE output is
+# build-dependent (Q16-HDRI ImageMagick builds print scientific notation with
+# counts scaled by 65535), which silently breaks the thresholds below.
 N=57600   # 240*240
 pct() {
   magick "$1" -resize 240x240\! "$TMP/a.png" 2>/dev/null
   magick "$2" -resize 240x240\! "$TMP/b.png" 2>/dev/null
-  magick compare -metric AE -fuzz 8% "$TMP/a.png" "$TMP/b.png" null: 2>&1 \
-    | grep -oE '^[0-9]+' | head -1 || echo "$N"
+  magick "$TMP/a.png" "$TMP/b.png" -compose difference -composite \
+    -colorspace gray -threshold 8% -format "%[fx:round(mean*57600)]" info: 2>/dev/null \
+    || echo "$N"
 }
 
 echo "waiting for render (differs from blank, then settles)..."

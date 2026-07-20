@@ -5,7 +5,7 @@
 - Manifest and jungle
 - Build and load into the simulator
 - Devices must be downloaded with fonts
-- Running the simulator (incl. Wayland)
+- Running the simulator (incl. Wayland, headless and container use)
 - Sideloading to a real watch
 
 ## SDK and dev key
@@ -18,6 +18,8 @@ export PATH="$(connect-iq-sdk-manager-cli sdk current-path --bin):$PATH"
 ```
 
 On a fresh machine, `scripts/setup-connectiq.sh [sdk-version] [manifest.xml]` bootstraps the whole CLI toolchain end to end: it generates (or reuses) the dev key, installs `connect-iq-sdk-manager-cli` via `go install`, logs in, accepts the EULA, and downloads an SDK plus the devices referenced by a manifest (with fonts). This avoids the GUI SDK Manager, whose prebuilt binary needs `libwebkit2gtk-4.0` (dropped on Arch/Manjaro).
+
+Note the CLI only replaces the *manager*: the **simulator binary itself also links `libwebkit2gtk-4.0.so.37`** (it is a wxWidgets/wxWebView app), so on a distro that ships only webkit2gtk-4.1 the sim will not start no matter how the SDK was installed (`monkeyc` builds still work — it is Java). Fixes: a distro package that still provides the 4.0 ABI (e.g. the AUR `webkit2gtk` package; a 4.1 symlink will NOT work, different ABI), or run the toolchain in a container/VM whose OS still ships 4.0 (Ubuntu 22.04, Debian bookworm — not Ubuntu 24.04). See "Headless and container use" below for making the sim work there, and <https://github.com/wistrand/garmin-dev> for a ready-made container env implementing all of it.
 
 A developer key is required to build. Generate one once and reuse it; for a published app the key must stay constant across releases.
 
@@ -91,6 +93,17 @@ GDK_BACKEND=x11 connectiq &
 ```
 
 To screenshot, capture the sim's X11 window by id rather than the screen (its title is "CIQ Simulator"); see `scripts/shot.sh`.
+
+### Headless and container use
+
+The sim runs fine in a container or on a headless box (verified: builds, interactive use over VNC, and the screenshot pipeline all work, with output identical to a desktop run). <https://github.com/wistrand/garmin-dev> packages all of the below as a ready-made Docker env (build script, launcher with host-X/headless modes, host shims); the requirements themselves, for rolling your own:
+
+- **A usable DISPLAY is mandatory.** Without one the sim segfaults at GTK init with `Gtk-CRITICAL _gtk_style_provider_private_get_settings` spam — easily misread as a sandbox/security problem. (In Docker, the default seccomp profile is fine and no `WEBKIT_DISABLE_*` variables are needed; software GL via llvmpipe renders correctly.)
+- **Headless needs a window manager, not just Xvfb.** Window lookup by title reads `_NET_CLIENT_LIST`, which only a WM populates — run `openbox` (or similar) under Xvfb, and `x11vnc`/noVNC if you want to interact.
+- **Use a UTF-8 locale** (`LC_ALL=C.UTF-8` is enough, no locale packages needed). Device window titles contain non-ASCII device names ("fēnix"); under an ASCII locale `xprop` fails the title conversion and the window lookup can silently capture a stale blank window while the face renders perfectly in another.
+- **On device load the sim may open a second "CIQ Simulator" window** (seen with Ubuntu 22.04's GTK) and leave the initial blank one listed — match the *last* title hit, not the first (the bundled scripts do).
+- Docker specifics: `--shm-size=512m` (the 64 MB default is too small for X rendering), X-socket + xauth passthrough for a desktop window (with the container user matching the host UID so the cookie is valid), and `DEBIAN_FRONTEND=noninteractive` when building images (tzdata's debconf prompt hangs the build invisibly).
+- Beware ImageMagick build variance in screenshot tooling: Q16-HDRI builds print `compare -metric AE` counts scaled by 65535 in scientific notation; the bundled `auto-shot.sh` measures changed pixels via a difference composite instead, which is build-independent.
 
 ## Sideloading to a real watch
 

@@ -54,12 +54,13 @@ sleep "$WAIT"
 
 # Find the simulator's X11 window id by WM_NAME among managed XWayland clients.
 # The sim is an XWayland client, so xprop sees it; capturing by id is immune to
-# the window moving and reads the window's backing pixmap directly.
+# the window moving and reads the window's backing pixmap directly. Take the
+# LAST match: on some GTK builds the sim creates a second window on device load
+# and leaves the initial blank one listed; the newest match is the live view.
 WIN=""
 for id in $(xprop -root _NET_CLIENT_LIST 2>/dev/null | grep -oE '0x[0-9a-f]+'); do
   if xprop -id "$id" WM_NAME 2>/dev/null | grep -qi 'CIQ Simulator'; then
     WIN="$id"
-    break
   fi
 done
 if [ -z "$WIN" ]; then
