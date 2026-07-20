@@ -44,7 +44,7 @@ def deref(ref):
 lines = [
     f"# {PROJECT} — settings reference",
     "",
-    "_Generated from `resources/settings/` by `scripts/gen-settings-doc.py` — do not edit by hand._",
+    "_Generated from `resources/settings/` by `gen-settings-doc.py` — do not edit by hand._",
     "",
     "Values shown are what the property stores, i.e. what an env-var override "
     "(e.g. via simrun.sh) accepts, such as `accentColor=0xFF3030`.",
